@@ -14,6 +14,9 @@ def main():
     cell_size = 400 // grid_cols
 
     cell_colors: list[list[tuple]] = [[(255,255,255)for _ in range(grid_cols)] for _ in range(grid_rows)]
+    velocity: list[list[int]] = [[0 for _ in range(grid_cols)] for _ in range(grid_rows)]
+    pressure: list[list[int]] = [[0 for _ in range(grid_cols)] for _ in range(grid_rows)]
+    density: list[list[int]] = [[0 for _ in range(grid_cols)] for _ in range(grid_rows)]
 
     running = True
     while running:
