@@ -1,6 +1,4 @@
 from random import random
-
-import colorsys
 import pygame
 import math
 from typing import *
@@ -14,18 +12,52 @@ def advect(field, x0, y0, x1, y1, sx, sy):
 
     return (1 - sx) * (1 - sy) * c1 + sx * (1 - sy) * c2 + (1 - sx) * sy * c3 + sx * sy * c4
 
+#1
+def density_to_rgb(d):
+    d = np.clip(d, 0.0, 1.0)
+    h6 = (1.0 - d) * 0.66 * 6.0
+    r = np.clip(np.abs(h6 - 3.0) - 1.0, 0.0, 1.0)
+    g = np.clip(2.0 - np.abs(h6 - 2.0), 0.0, 1.0)
+    b = np.clip(2.0 - np.abs(h6 - 4.0), 0.0, 1.0)
+    return (np.stack([r, g, b], axis=-1) * 255).astype(np.uint8)
+#2
+def density_to_white(d):
+    d = np.clip(d, 0.0, 1.0)
+    return (np.stack([d, d, d], axis=-1) * 255).astype(np.uint8)
+#3
+def pressure_to_rgb(p):
+    p = np.clip(p, -1.0, 1.0)
+    r = np.clip(p, 0.0, 1.0)
+    g = np.clip(1.0 - np.abs(p), 0.0, 1.0)
+    b = np.clip(-p, 0.0, 1.0)
+    return (np.stack([r, g, b], axis=-1) * 255).astype(np.uint8)
+#4
+def velocity_to_rgb(u, v):
+    mag = np.sqrt(u**2 + v**2)
+    angle = np.arctan2(v, u) / (2 * np.pi) + 0.5
+    r = np.clip(np.abs(angle - 0.5) * 2, 0.0, 1.0)
+    g = np.clip(1.0 - np.abs(angle - 0.25) * 4, 0.0, 1.0)
+    b = np.clip(1.0 - np.abs(angle - 0.75) * 4, 0.0, 1.0)
+    return (np.stack([r, g, b], axis=-1) * (mag[..., None] / np.max(mag)) * 255).astype(np.uint8)
+
+
+
 def main():
     pygame.init()
 
-    screen = pygame.display.set_mode((400, 400))
-    pygame.display.set_caption("Simple Grid")
-    clock = pygame.time.Clock()
+    view_mode = 1
+
+    gravity = False
 
     grid_cols = 80
     grid_rows = 80
-    cell_size = 400 // grid_cols
+    cell_size = 1000 // grid_cols
 
-    dt = 1/60
+    screen = pygame.display.set_mode((grid_cols*cell_size, grid_rows * cell_size))
+    pygame.display.set_caption("Eulerian Fluid Simulation")
+    clock = pygame.time.Clock()
+
+    dt = 1/30
 
     #with border cells
     shape = (grid_cols + 2 , grid_rows + 2)
@@ -39,35 +71,78 @@ def main():
         np.arange(shape[1], dtype=np.float32),
         indexing="ij",
     )
+
+    source_width = 10
+    source_height = 5
+
+    source_offset_x = 10
+    source_offset_y = 0
     
     running = True
     while running:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_1:
+                    view_mode = 1
+                elif event.key == pygame.K_2:
+                    view_mode = 2
+                elif event.key == pygame.K_3:
+                    view_mode = 3
+                elif event.key == pygame.K_4:
+                    view_mode = 4
+
+                elif event.key == pygame.K_RIGHT:
+                    source_offset_x += 10
+                elif event.key == pygame.K_LEFT:
+                    source_offset_x -= 10
+                elif event.key == pygame.K_UP:
+                    source_offset_y -= 10
+                elif event.key == pygame.K_DOWN:
+                    source_offset_y += 10
+
+                elif event.key == pygame.K_g:
+                    gravity = not gravity
 
         #add forces
+        #gravity
+        if gravity:
+            v[1:-1, 1:-1] += 200 * dt    
         #source
-        density[30:50, 75:80] = 1
-        v[30:50, 70:80] += -50
+
+
+        mid_point_x = grid_cols//2 + source_offset_x
+
+        left_x = mid_point_x-(source_width//2)
+        right_x = mid_point_x+(source_width//2)
+
+        top_point_y = grid_rows - source_height + source_offset_y
+        bottom_point_y = grid_rows+1 + source_offset_y
+
+        density[left_x:right_x, top_point_y:bottom_point_y] = 1
+        v[left_x:right_x, top_point_y:bottom_point_y] += -50
+
+        # v[30:50, 1:10] += 50
+        # density[30:50, 1:10] = 1
         #mouse
-        if pygame.mouse.get_pressed()[0]:
-            mouse_x, mouse_y = pygame.mouse.get_pos()
-            grid_x = mouse_x // cell_size
-            grid_y = mouse_y // cell_size
-            radius = 3
-            for i in range(-radius, radius + 1):
-                for j in range(-radius, radius + 1):
-                    if i**2 + j**2 <= radius**2:
-                        x = grid_x + i + 1
-                        y = grid_y + j + 1
-                        if 0 <= x < shape[0] and 0 <= y < shape[1]:
-                            density[x, y] = 0.5
-                            mouse_dx, mouse_dy = pygame.mouse.get_rel()
-                            u[x, y] += mouse_dx * 200
-                            v[x, y] += mouse_dy * 200
+        # if pygame.mouse.get_pressed()[0]:
+        #     mouse_x, mouse_y = pygame.mouse.get_pos()
+        #     grid_x = mouse_x // cell_size
+        #     grid_y = mouse_y // cell_size
+        #     radius = 4
+        #     for i in range(-radius, radius + 1):
+        #         for j in range(-radius, radius + 1):
+        #             if i**2 + j**2 <= radius**2:
+        #                 x = grid_x + i + 1
+        #                 y = grid_y + j + 1
+        #                 if 0 <= x < shape[0] and 0 <= y < shape[1]:
+        #                     density[x, y] = 0.5
+        #                     mouse_dx, mouse_dy = pygame.mouse.get_rel()
+        #                     u[x, y] += mouse_dx * 200
+        #                     v[x, y] += mouse_dy * 200
         #density decay
-        density *= 0.99
+        density *= 0.999
 
         #advect
         x_source = x_idx - u * dt
@@ -107,23 +182,19 @@ def main():
         u[1:-1, 1:-1] -= (pressure[2:, 1:-1] - pressure[:-2, 1:-1]) * 0.5
         v[1:-1, 1:-1] -= (pressure[1:-1, 2:] - pressure[1:-1, :-2]) * 0.5
 
+        if view_mode == 1:
+            rgb = density_to_rgb(density[1:-1, 1:-1])
+        elif view_mode == 2:
+            rgb = density_to_white(density[1:-1, 1:-1])
+        elif view_mode == 3:
+            rgb = pressure_to_rgb(pressure[1:-1, 1:-1])
+        elif view_mode == 4:
+            rgb = velocity_to_rgb(u[1:-1, 1:-1], v[1:-1, 1:-1])
+        else:
+            rgb = density_to_rgb(density[1:-1, 1:-1])
 
-
-        screen.fill((30, 30, 40))
-
-        for j in range(grid_rows):
-            for i in range(grid_cols):
-                rect = pygame.Rect(
-                    j * cell_size, i * cell_size, cell_size, cell_size
-                )
-                #density is 0-1
-                d = density[j+1][i+1]
-
-                h = (1 - d) * 0.66  # 0.66 is blue, 0 is red
-                r, g, b = colorsys.hsv_to_rgb(h, 1, 1)
-
-                pygame.draw.rect(screen, (round(r * 255), round(g * 255), round(b * 255)), rect)
-
+        small = pygame.surfarray.make_surface(rgb)
+        screen.blit(pygame.transform.scale(small, screen.get_size()), (0, 0))
         pygame.display.flip()
         clock.tick(60)
 
