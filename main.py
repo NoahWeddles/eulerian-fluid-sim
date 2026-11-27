@@ -65,6 +65,7 @@ def main():
     v = np.zeros(shape, dtype=np.float32)
     pressure = np.zeros(shape, dtype=np.float32)
     density = np.zeros(shape, dtype=np.float32)
+    solid = np.zeros(shape, dtype=np.bool)
 
     x_idx, y_idx = np.meshgrid(
         np.arange(shape[0], dtype=np.float32),
@@ -126,21 +127,22 @@ def main():
         # v[30:50, 1:10] += 50
         # density[30:50, 1:10] = 1
         #mouse
-        # if pygame.mouse.get_pressed()[0]:
-        #     mouse_x, mouse_y = pygame.mouse.get_pos()
-        #     grid_x = mouse_x // cell_size
-        #     grid_y = mouse_y // cell_size
-        #     radius = 4
-        #     for i in range(-radius, radius + 1):
-        #         for j in range(-radius, radius + 1):
-        #             if i**2 + j**2 <= radius**2:
-        #                 x = grid_x + i + 1
-        #                 y = grid_y + j + 1
-        #                 if 0 <= x < shape[0] and 0 <= y < shape[1]:
-        #                     density[x, y] = 0.5
-        #                     mouse_dx, mouse_dy = pygame.mouse.get_rel()
-        #                     u[x, y] += mouse_dx * 200
-        #                     v[x, y] += mouse_dy * 200
+        mouse_dx, mouse_dy = pygame.mouse.get_rel()
+
+        if pygame.mouse.get_pressed()[0]:
+            mouse_x, mouse_y = pygame.mouse.get_pos()
+            grid_x = mouse_x // cell_size
+            grid_y = mouse_y // cell_size
+            radius = 4
+            for i in range(-radius, radius + 1):
+                for j in range(-radius, radius + 1):
+                    if i**2 + j**2 <= radius**2:
+                        x = grid_x + i + 1
+                        y = grid_y + j + 1
+                        if 1 <= x < shape[0] - 1 and 1 <= y < shape[1] - 1:
+                            # density[x, y] = 0.5
+                            u[x, y] += mouse_dx * 10
+                            v[x, y] += mouse_dy * 10
         #density decay
         density *= 0.999
 
@@ -166,6 +168,17 @@ def main():
         density[1:-1, 1:-1] = advect(density, x0, y0, x1, y1, sx, sy)[1:-1, 1:-1]
         u[1:-1, 1:-1] = advect(u, x0, y0, x1, y1, sx, sy)[1:-1, 1:-1]
         v[1:-1, 1:-1] = advect(v, x0, y0, x1, y1, sx, sy)[1:-1, 1:-1]
+
+        #enforce boundary conditions
+        u[0, :] = 0
+        u[-1, :] = 0
+        u[:, 0] = 0
+        u[:, -1] = 0
+        v[0, :] = 0
+        v[-1, :] = 0
+        v[:, 0] = 0
+        v[:, -1] = 0
+        
 
         #projection
         divergence = (u[2:, 1:-1] - u[:-2, 1:-1] + v[1:-1, 2:] - v[1:-1, :-2]) * 0.5
